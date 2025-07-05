@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\ValidationException;
 
 class RegisteredUserController extends Controller
 {
@@ -50,7 +51,6 @@ class RegisteredUserController extends Controller
                 'password' => Hash::make($request->password),
             ]);
 
-            event(new Registered($user));
 
             $customer = new Customer();
             $names = explode(" ", $user->name);
@@ -58,13 +58,15 @@ class RegisteredUserController extends Controller
             $customer->first_name = $names[0];
             $customer->last_name = $names[1] ?? '';
             $customer->save();
-
+            event(new Registered($user));
             Auth::login($user);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withInput()->with('error', 'Unable to register right now.');
+            throw ValidationException::withMessages([
+                'email' => 'There was a problem during email sending. Please try to login with existing accounts',
+            ]);
         }
-
         DB::commit();
 
         Cart::moveCartItemsIntoDb();
